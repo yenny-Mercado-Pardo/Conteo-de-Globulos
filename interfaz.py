@@ -1,6 +1,8 @@
-from tkinter import Tk, Label, Button,Frame,LEFT,filedialog,BOTH,TOP,RAISED,CENTER,Text,Scrollbar,END
+from tkinter import Tk, Label, Button,Frame,LEFT,filedialog,BOTH,Entry,CENTER,Text,Scrollbar,END
 from PIL import ImageTk, Image
 from gb import ProcesamientoImagen
+import cv2
+import datetime
 X_W = 1200
 Y_H = 600
 RESIZE_IMG = (int(X_W * 0.38-25), int(Y_H*0.95-25))
@@ -57,9 +59,32 @@ class Interfaz:
         self.loadFile = Button(self.panelControl,  command=self.open_img, height=2,
             relief = "groove", compound = CENTER, text="Cargar imagen").pack(fill=BOTH,padx=10, pady=10)
 
+        #frame para conectarse a la camara ip
+        self.frameCamera = Frame(self.panelControl)
+        self.frameCamera.pack_propagate(0)
+        self.frameCamera.pack(fill=BOTH,padx=10)
+
+        #input link de la camara ip
+        self.entryLink = Entry(self.frameCamera)
+        self.entryLink.grid(row=0,column=0)
+        self.entryLink.insert(0,'http://192.168.0.3:8080/video')
+
+        #button de conexion
+        self.connectButton = Button(self.frameCamera,text="CM",command=self.prepareIpCamera)
+        self.connectButton.grid(row=0,column=1)
+
+        #button de captura de imagen
+        self.snaptshotButton = Button(self.frameCamera, text="CA",command=self.snapShotCamera)
+        self.snaptshotButton.grid(row=0, column=2)
+
+
         #aplicando el analisis
         self.applyProceso = Button(self.panelControl, command=self.procesarOpencv, height=2,
-                           relief="groove", compound=CENTER, text="Procesar").pack(fill=BOTH, padx=10)
+                           relief="groove", compound=CENTER, text="Procesar").pack(fill=BOTH, padx=10,pady=10)
+
+        # aplicando el analisis
+        self.applyStepProceso = Button(self.panelControl, command=self.callStepProcess, height=2,
+                        relief="groove", compound=CENTER, text="Paso por paso").pack(fill=BOTH, padx=10)
 
         self.formulaGB = Label(self.panelControl, text="total = XXX * 20 * 2.5 (mxx)").pack(fill=BOTH,padx=10)
         self.formulaGR = Label(self.panelControl, text="total = XXX * 200 * 10 * 5 (mxx)").pack(fill=BOTH,padx=10)
@@ -71,18 +96,84 @@ class Interfaz:
         scroll_y.pack(side="right", fill="y")
         self.textArea.configure(yscrollcommand=scroll_y.set)
 
+        self.captureStrem = False
+        self.streamVideo = None
+
+    def prepareIpCamera(self):
+        self.connectCamera()
+        self.videoStreamIpCamera()
+
+    def connectCamera(self):
+        link = self.entryLink.get()
+        try:
+            self.printLn("Connect: " + link )
+            self.streamVideo = cv2.VideoCapture(link)
+        except:
+            self.printLn("Verifique la direccion, no se ha podido conectar")
+
+
+    def snapShotCamera(self):
+        if self.streamVideo is None:
+            return
+        if self.streamVideo.isOpened():
+            ret,frame = self.streamVideo.read()
+            #cortando la transmision
+            self.streamVideo = None
+            # guardando la imagen
+            directorio = "camera/" + str(datetime.datetime.now()) + ".jpg"
+            cv2.imwrite(directorio, frame)
+            #cv2image = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+            img = Image.fromarray(cv2image)
+            img = img.resize(RESIZE_IMG, Image.BICUBIC)
+            #mostrando el resultado en pantalla
+            self.showFrameImage(img)
+            self.pathOriginal = directorio
+
+    def videoStreamIpCamera(self):
+        if self.streamVideo is None:
+            return
+        if self.streamVideo.isOpened():
+            ret, frame = self.streamVideo.read()
+            cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+            img = Image.fromarray(cv2image)
+            img = img.resize(RESIZE_IMG, Image.BICUBIC)
+            self.showFrameImage(img)
+            self.panel.after(1,self.videoStreamIpCamera)
+        else:
+            self.printLn("Verifique su conexion")
+            return
+
     def printLn(self, text):
         self.textArea.insert(END, str(text) + "\n")
 
+    def callStepProcess(self):
+        if self.pathOriginal is None:
+            self.printLn("Sebe seleccionar la imagen")
+            return
+        process = ProcesamientoImagen(self.pathOriginal)
+        process.showAllStep()
+
     def procesarOpencv(self):
+        if self.pathOriginal is None:
+            self.printLn("Sebe seleccionar la imagen")
+            return
         procesarImg = ProcesamientoImagen(self.pathOriginal)
         array,region = procesarImg.procesar()
         img = Image.fromarray(array)
         img = img.resize(RESIZE_IMG, Image.BICUBIC)
-        img = ImageTk.PhotoImage(img)
-        self.panelProcesado.config(image=img)
-        self.panelProcesado.image = img
+        self.showFrameProcesado(img)
         self.printLn("cantidad: " + str(len(region)))
+
+    def showFrameProcesado(self,img):
+        frame = ImageTk.PhotoImage(img)
+        self.panelProcesado.config(image=frame)
+        self.panelProcesado.image = frame
+
+    def showFrameImage(self,img):
+        frame = ImageTk.PhotoImage(img)
+        self.panel.config(image=frame)
+        self.panel.image = frame
 
     def open_img(self):
         x = self.openfn()
@@ -91,9 +182,8 @@ class Interfaz:
         self.printLn(x)
         img = Image.open(x)
         img = img.resize(RESIZE_IMG, Image.BICUBIC)
-        img = ImageTk.PhotoImage(img)
-        self.panel.config(image=img)
-        self.panel.image = img
+        self.showFrameImage(img)
+
 
     def openfn(self):
         filename = filedialog.askopenfilename(title='open')
