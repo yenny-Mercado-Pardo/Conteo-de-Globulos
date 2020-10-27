@@ -6,7 +6,7 @@ from PIL import ImageTk, Image
 from matplotlib import pyplot as plt
 import numpy as np
 import scipy.ndimage
-YENNY = 0.30
+YENNY = 0.2
 class ProcesamientoImagen:
     def __init__(self, path):
         self.path = path

@@ -1,4 +1,4 @@
-from tkinter import Tk, Label, Button,Frame,LEFT,filedialog,BOTH,Entry,CENTER,Text,Scrollbar,END
+from tkinter import Tk, Label, Button,Frame,LEFT,filedialog,BOTH,Entry,CENTER,Text,Scrollbar,END,Radiobutton,IntVar
 from PIL import ImageTk, Image
 from gb import ProcesamientoImagen
 import cv2
@@ -86,8 +86,12 @@ class Interfaz:
         self.applyStepProceso = Button(self.panelControl, command=self.callStepProcess, height=2,
                         relief="groove", compound=CENTER, text="Paso por paso").pack(fill=BOTH, padx=10)
 
-        self.formulaGB = Label(self.panelControl, text="total = XXX * 20 * 2.5 (mxx)").pack(fill=BOTH,padx=10)
-        self.formulaGR = Label(self.panelControl, text="total = XXX * 200 * 10 * 5 (mxx)").pack(fill=BOTH,padx=10)
+        self.valor = IntVar()
+        self.valor.set(1)
+        self.radioButton1 = Radiobutton(self.panelControl, text="total(blanco) = XXX * 20 * 2.5 (mm3)", variable=self.valor, value=1)
+        self.radioButton1.pack(fill=BOTH, padx=10)
+        self.radioButton2 = Radiobutton(self.panelControl, text="total(rojo) = XXX * 200 * 10 * 5 (mmm3)", variable=self.valor, value=2)
+        self.radioButton2.pack(fill=BOTH, padx=10)
 
         #scroll a modo de consola
         self.textArea = Text(self.panelControl)
@@ -98,6 +102,12 @@ class Interfaz:
 
         self.captureStrem = False
         self.streamVideo = None
+
+    def calcularRojos(self,cantidad):
+        self.printLn("C. eritrocitos " + str(cantidad * 200 * 10 * 5 ) + " mm3")
+
+    def calcularBlancos(self, cantidad):
+        self.printLn("C. leucocitos " + str(cantidad * 20 * 2.5) + " mm3")
 
     def prepareIpCamera(self):
         self.connectCamera()
@@ -110,7 +120,6 @@ class Interfaz:
             self.streamVideo = cv2.VideoCapture(link)
         except:
             self.printLn("Verifique la direccion, no se ha podido conectar")
-
 
     def snapShotCamera(self):
         if self.streamVideo is None:
@@ -154,6 +163,12 @@ class Interfaz:
         process = ProcesamientoImagen(self.pathOriginal)
         process.showAllStep()
 
+    def showCantidad(self,cantidad):
+        if( self.valor.get() == 2):
+            self.calcularRojos(cantidad)
+        else:
+            self.calcularBlancos(cantidad)
+
     def procesarOpencv(self):
         if self.pathOriginal is None:
             self.printLn("Sebe seleccionar la imagen")
@@ -163,7 +178,8 @@ class Interfaz:
         img = Image.fromarray(array)
         img = img.resize(RESIZE_IMG, Image.BICUBIC)
         self.showFrameProcesado(img)
-        self.printLn("cantidad: " + str(len(region)))
+        self.printLn("Total: " + str(len(region)))
+        self.showCantidad(len(region))
 
     def showFrameProcesado(self,img):
         frame = ImageTk.PhotoImage(img)
@@ -184,7 +200,6 @@ class Interfaz:
         img = img.resize(RESIZE_IMG, Image.BICUBIC)
         self.showFrameImage(img)
 
-
     def openfn(self):
         filename = filedialog.askopenfilename(title='open')
         return filename
@@ -193,10 +208,3 @@ root = Tk()
 root.resizable(False, False)
 windows = Interfaz(root)
 root.mainloop()
-
-
-# => GR
-# => total = XXX * 200 * 10 * 5 (mxx)
-
-# => GB
-# => total = XXX * 20 * 2.5 (mxx)
